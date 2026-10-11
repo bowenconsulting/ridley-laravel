@@ -1,0 +1,28 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - src
+        - config
+        - database
+        - routes
+        - tests/Fixtures/User.php
+    universalObjectCratesClasses:
+        - Ridley\Laravel\Resources\RidleyObject
+    ignoreErrors:
+        # Billable behaviour is provided by a trait on an arbitrary app model, so it is called on Model.
+        - identifier: method.notFound
+          message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model::#'
+        # Testing helper trait is consumed by application test cases.
+        - identifier: trait.unused
+          path: src/Testing/InteractsWithRidleyWebhooks.php
+        # env() is only used inside config/ridley.php, which is the package's config file.
+        - identifier: larastan.noEnvCallsOutsideOfConfig
+          path: config/ridley.php
+        # Exceptions and the fake use named constructors that are intentionally extendable.
+        - identifier: new.static
+        # Notification views are package-namespaced markdown views (ridley::...).
+        - identifier: argument.type
+          message: '#view-string#'
