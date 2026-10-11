@@ -19,7 +19,7 @@ return new class extends Migration
             $table->char('ridley_currency', 3)->nullable();
         });
 
-        if (! Schema::hasColumn($this->table(), 'trial_ends_at')) {
+        if (config('ridley.trial.generic', true) && ! Schema::hasColumn($this->table(), 'trial_ends_at')) {
             Schema::table($this->table(), function (Blueprint $table) {
                 $table->timestamp('trial_ends_at')->nullable();
             });

@@ -17,7 +17,6 @@ use Ridley\Laravel\Resources\Customer;
 use Ridley\Laravel\Resources\Session;
 use Ridley\Laravel\Resources\Subscription as RidleySubscription;
 use Ridley\Laravel\Support\PriceResolver;
-use Ridley\Laravel\Support\Timestamp;
 use Throwable;
 
 /**
@@ -172,7 +171,7 @@ class SubscriptionBuilder
      */
     public function trialUntilIfFuture(?DateTimeInterface $date = null): static
     {
-        $date ??= Timestamp::parse($this->owner->getAttribute('trial_ends_at'));
+        $date ??= $this->owner->genericTrialEndsAt();
 
         if ($date !== null && Carbon::instance($date)->isFuture()) {
             $this->skipTrial = false;

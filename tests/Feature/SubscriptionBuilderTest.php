@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
 use Ridley\Laravel\Events\SubscriptionSynced;
@@ -10,6 +11,7 @@ use Ridley\Laravel\Exceptions\IncompletePayment;
 use Ridley\Laravel\Exceptions\PriceNotFound;
 use Ridley\Laravel\Ridley;
 use Ridley\Laravel\Subscription;
+use Ridley\Laravel\Tests\Fixtures\ExternalTrialUser;
 
 it('creates a subscription from catalogue keys and mirrors it locally', function () {
     $fake = Ridley::fake();
@@ -98,6 +100,23 @@ it('handles trials', function () {
     $user->update(['trial_ends_at' => Carbon::now()->addDays(5)]);
     $user->newSubscription('generic')->catalogue('plan', 'starter', 'USD', 'month')->trialUntilIfFuture()->create();
     expect($user->ridleySubscription('generic')->trial_ends_at->isSameDay(Carbon::now()->addDays(5)))->toBeTrue();
+});
+
+it('takes the trial end from an overridden genericTrialEndsAt', function () {
+    Ridley::fake();
+    $this->syncCatalogue();
+    $user = ExternalTrialUser::query()->findOrFail($this->customerWithCard()->getKey());
+    ExternalTrialUser::$trialEndsAt = CarbonImmutable::now()->addDays(9);
+
+    try {
+        $subscription = $user->newSubscription('default')->catalogue('plan', 'starter', 'USD', 'month')->trialUntilIfFuture()->create();
+
+        expect($user->getAttribute('trial_ends_at'))->toBeNull()
+            ->and($user->onGenericTrial())->toBeTrue()
+            ->and($subscription->trial_ends_at->isSameDay(CarbonImmutable::now()->addDays(9)))->toBeTrue();
+    } finally {
+        ExternalTrialUser::$trialEndsAt = null;
+    }
 });
 
 it('subscribes or checks out in one call', function () {

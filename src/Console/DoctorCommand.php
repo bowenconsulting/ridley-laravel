@@ -113,7 +113,8 @@ class DoctorCommand extends Command
         $instance = new $model;
 
         try {
-            $missing = array_values(array_diff(self::BILLABLE_COLUMNS, Schema::connection($instance->getConnectionName())->getColumnListing($instance->getTable())));
+            $required = config('ridley.trial.generic', true) ? self::BILLABLE_COLUMNS : array_diff(self::BILLABLE_COLUMNS, ['trial_ends_at']);
+            $missing = array_values(array_diff($required, Schema::connection($instance->getConnectionName())->getColumnListing($instance->getTable())));
         } catch (Throwable $exception) {
             $this->failCheck('Billable columns', $exception->getMessage());
 

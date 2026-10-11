@@ -12,6 +12,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-11
+
+### Added
+
+- `ridley.trial.generic` (`RIDLEY_GENERIC_TRIALS`): set it to false to keep trials outside the billable. The migration skips `trial_ends_at` and `ridley:doctor` stops requiring it.
+
+### Fixed
+
+- `trialUntilIfFuture()` now reads the default date through `genericTrialEndsAt()`, so overriding that method works.
+
 ## [0.1.0] - 2026-10-11
 
 Initial early-development release.

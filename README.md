@@ -527,6 +527,15 @@ $account->newSubscription('default')->catalogue('plan', 'pro', 'USD', 'month')
     ->createOrCheckout($success, $cancel);
 ```
 
+If your app already tracks trials somewhere else, set `RIDLEY_GENERIC_TRIALS=false` before migrating. The billable migration then skips `trial_ends_at` and `ridley:doctor` stops requiring it. Override `genericTrialEndsAt()` to return your own date; `onGenericTrial()` and `trialUntilIfFuture()` use it:
+
+```php
+public function genericTrialEndsAt(): ?CarbonImmutable
+{
+    return $this->plan?->trial_ends_at?->toImmutable();
+}
+```
+
 ## Entitlements (optional)
 
 This section is pure opt-in. If you have your own entitlement system, ignore it.

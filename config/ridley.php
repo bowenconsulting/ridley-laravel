@@ -171,9 +171,14 @@ return [
     | subscription yet) may use: the features/limits of a catalogue item
     | (e.g. 'plan.starter') and/or explicit features and limits.
     |
+    | Set `generic` to false when your app tracks trials elsewhere: the
+    | migration then skips the `trial_ends_at` column, and you override
+    | genericTrialEndsAt() on the billable to read your own trial date.
+    |
     */
 
     'trial' => [
+        'generic' => env('RIDLEY_GENERIC_TRIALS', true),
         'catalogue_item' => env('RIDLEY_TRIAL_ITEM'),
         'features' => [],
         'limits' => [],
