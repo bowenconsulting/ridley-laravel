@@ -60,9 +60,11 @@ jobs:
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction --no-progress
 
       - name: Pint
+        if: matrix.stability == 'prefer-stable'
         run: vendor/bin/pint --test
 
       - name: PHPStan
+        if: matrix.stability == 'prefer-stable'
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
 
       - name: Tests
