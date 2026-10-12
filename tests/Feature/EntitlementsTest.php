@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Ridley\Laravel\Ridley;
+use Ridley\Laravel\Tests\Fixtures\SluggedUser;
 
 beforeEach(function () {
     Ridley::fake();
@@ -73,4 +74,12 @@ it('guards routes with the middleware aliases', function () {
     $user->ridleySubscription()->change(Ridley::catalogue()->resolve('USD', 'month', [['group' => 'plan', 'key' => 'professional']]));
 
     $this->actingAs($user)->get('/_api')->assertOk();
+});
+
+it('redirects to the billable\'s own billing url', function () {
+    config(['ridley.billing_url' => 'https://app.example.com/billing']);
+    Route::middleware(['web', 'ridley.subscribed'])->get('/_slugged', fn () => 'ok');
+    $user = SluggedUser::query()->findOrFail($this->user()->getKey());
+
+    $this->actingAs($user)->get('/_slugged')->assertRedirect("https://app.example.com/accounts/{$user->getKey()}/billing");
 });

@@ -156,6 +156,18 @@ trait ManagesCustomer
         ];
     }
 
+    /**
+     * Where this billable manages its billing: used by notifications and the
+     * subscription/feature middleware. Override it when the URL depends on the
+     * billable (e.g. an account slug in the path).
+     */
+    public function ridleyBillingUrl(): ?string
+    {
+        $url = config('ridley.notifications.billing_url') ?? config('ridley.billing_url');
+
+        return is_string($url) && $url !== '' ? $url : null;
+    }
+
     public function preferredCurrency(): string
     {
         return strtoupper((string) config('ridley.currency', 'USD'));

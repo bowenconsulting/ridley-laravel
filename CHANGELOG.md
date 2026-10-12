@@ -12,6 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-12
+
+### Added
+
+- `Billable::ridleyBillingUrl()`: the billing page for a billable, used by notifications and the `ridley.subscribed` / `ridley.feature` middleware. Override it when the URL depends on the billable (an account slug in the path). Defaults to `ridley.notifications.billing_url` / `ridley.billing_url`.
+- `RidleyBillingNotification::forBillable()`.
+
 ## [0.1.1] - 2026-10-11
 
 ### Added

@@ -19,6 +19,7 @@ use Ridley\Laravel\Ridley;
 use Ridley\Laravel\Subscription;
 use Ridley\Laravel\Tests\Fixtures\LegacyPlan;
 use Ridley\Laravel\Tests\Fixtures\Organization;
+use Ridley\Laravel\Tests\Fixtures\SluggedUser;
 use Ridley\Laravel\WebhookSignature;
 
 function subscriptionObject(string $customer, array $overrides = []): array
@@ -234,4 +235,15 @@ it('renders the notification mail with the fallback billing url', function () {
     $mail = (new TrialWillEnd(subscriptionObject('cus_1', ['trial_end' => Carbon::now()->addDays(3)->toIso8601String()])))->toMail($user);
 
     expect((string) $mail->render())->toContain('https://app.example.com/billing');
+});
+
+it('links notifications to the billable\'s own billing url', function () {
+    config(['ridley.billing_url' => 'https://app.example.com/billing']);
+    $user = SluggedUser::query()->findOrFail($this->user()->getKey());
+
+    $mail = (new TrialWillEnd(subscriptionObject('cus_1', ['trial_end' => Carbon::now()->addDays(3)->toIso8601String()])))
+        ->forBillable($user)
+        ->toMail($user);
+
+    expect((string) $mail->render())->toContain("https://app.example.com/accounts/{$user->getKey()}/billing");
 });

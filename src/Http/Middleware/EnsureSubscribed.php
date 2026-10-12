@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Ridley\Laravel\Http\Middleware;
 
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Ridley\Laravel\Ridley;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,15 +25,17 @@ class EnsureSubscribed
         $allowed = $billable !== null && method_exists($billable, 'subscribed')
             && ($billable->subscribed($type) || ($type === 'default' && $billable->onGenericTrial()));
 
-        return $allowed ? $next($request) : self::deny($request, 'A subscription is required.');
+        return $allowed ? $next($request) : self::deny($request, 'A subscription is required.', $billable);
     }
 
     /**
      * 402 JSON for API requests, otherwise a redirect to `ridley.billing_url`.
      */
-    public static function deny(Request $request, string $message): Response
+    public static function deny(Request $request, string $message, ?Model $billable = null): Response
     {
-        $billingUrl = config('ridley.billing_url');
+        $billingUrl = $billable !== null && method_exists($billable, 'ridleyBillingUrl')
+            ? $billable->ridleyBillingUrl()
+            : config('ridley.billing_url');
 
         if ($request->expectsJson() || ! is_string($billingUrl) || $billingUrl === '') {
             return response()->json(['message' => $message, 'billing_url' => $billingUrl], 402);

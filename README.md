@@ -729,7 +729,14 @@ Set `RIDLEY_NOTIFICATIONS=true` to email customers about these events:
 | `InvoicePaymentActionRequired` | `invoice.payment_action_required` | "Pay invoice" |
 | `TrialWillEnd` | `customer.subscription.trial_will_end` | "Update payment method" |
 
-The action URL is the invoice's `payment_url`, or `ridley.notifications.billing_url` as a fallback.
+The action URL is the invoice's `payment_url`, otherwise `$billable->ridleyBillingUrl()`. That defaults to `ridley.notifications.billing_url` (then `ridley.billing_url`); override it when the billing page depends on the billable. The `ridley.subscribed` and `ridley.feature` middleware redirect there too:
+
+```php
+public function ridleyBillingUrl(): ?string
+{
+    return route('billing.show', $this);
+}
+```
 
 Recipients come from `$billable->ridleyNotifiables()`. By default this is the billable itself when it uses `Notifiable`, otherwise nobody. Override it to notify, for example, an account's admins:
 

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Ridley\Laravel\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Ridley\Laravel\Concerns\ManagesCustomer;
 use Ridley\Laravel\Ridley;
 use Ridley\Laravel\Support\Timestamp;
 
@@ -21,6 +23,32 @@ abstract class RidleyBillingNotification extends Notification
      * @param  array<string, mixed>  $object  The webhook `data.object`.
      */
     public function __construct(public readonly array $object) {}
+
+    /**
+     * The billable the notice is about; its {@see ManagesCustomer::ridleyBillingUrl()} is the fallback link.
+     */
+    public ?Model $billable = null;
+
+    public function forBillable(?Model $billable): static
+    {
+        $this->billable = $billable;
+
+        return $this;
+    }
+
+    /**
+     * The billable's billing page, else the configured one.
+     */
+    protected function billingUrl(): ?string
+    {
+        if ($this->billable !== null && method_exists($this->billable, 'ridleyBillingUrl')) {
+            return $this->billable->ridleyBillingUrl();
+        }
+
+        $fallback = config('ridley.notifications.billing_url') ?? config('ridley.billing_url');
+
+        return is_string($fallback) && $fallback !== '' ? $fallback : null;
+    }
 
     /**
      * @return list<string>
@@ -65,9 +93,7 @@ abstract class RidleyBillingNotification extends Notification
             return $url;
         }
 
-        $fallback = config('ridley.notifications.billing_url') ?? config('ridley.billing_url');
-
-        return is_string($fallback) && $fallback !== '' ? $fallback : null;
+        return $this->billingUrl();
     }
 
     /**

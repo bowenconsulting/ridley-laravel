@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 use Ridley\Laravel\Events;
 use Ridley\Laravel\Events\SubscriptionSynced;
 use Ridley\Laravel\Notifications;
+use Ridley\Laravel\Notifications\RidleyBillingNotification;
 use Ridley\Laravel\Subscription;
 use Ridley\Laravel\Support\SubscriptionMirror;
 use Symfony\Component\HttpFoundation\Response;
@@ -347,7 +348,7 @@ class WebhookController extends Controller
     /**
      * Send a dunning notification to the billable's notifiables when enabled.
      *
-     * @param  callable(): \Illuminate\Notifications\Notification  $notification
+     * @param  callable(): RidleyBillingNotification  $notification
      */
     protected function notify(?Model $billable, callable $notification): void
     {
@@ -360,7 +361,7 @@ class WebhookController extends Controller
         $notifiables = collect($recipients)->filter()->values();
 
         if ($notifiables->isNotEmpty()) {
-            Notification::send($notifiables, $notification());
+            Notification::send($notifiables, $notification()->forBillable($billable));
         }
     }
 

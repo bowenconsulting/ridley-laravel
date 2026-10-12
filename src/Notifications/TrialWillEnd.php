@@ -25,9 +25,7 @@ class TrialWillEnd extends RidleyBillingNotification
 
     public function actionUrl(): ?string
     {
-        $fallback = config('ridley.notifications.billing_url') ?? config('ridley.billing_url');
-
-        return is_string($fallback) && $fallback !== '' ? $fallback : null;
+        return $this->billingUrl();
     }
 
     public function toMail(object $notifiable): MailMessage

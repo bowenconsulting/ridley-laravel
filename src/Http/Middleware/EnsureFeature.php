@@ -25,6 +25,6 @@ class EnsureFeature
             return $next($request);
         }
 
-        return EnsureSubscribed::deny($request, "Your plan does not include [{$feature}].");
+        return EnsureSubscribed::deny($request, "Your plan does not include [{$feature}].", $billable);
     }
 }
