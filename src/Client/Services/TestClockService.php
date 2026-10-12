@@ -62,12 +62,17 @@ class TestClockService extends AbstractService
 
     /**
      * Move the clock forward to `$frozenTime` (unix timestamp, date string or DateTime).
+     * Ridley takes ISO 8601, so timestamps and DateTimes are converted.
      *
      * @param  array{idempotency_key?: string|null}  $opts
      */
     public function advance(string $id, int|string|DateTimeInterface $frozenTime, array $opts = []): TestClock
     {
-        $frozenTime = $frozenTime instanceof DateTimeInterface ? $frozenTime->getTimestamp() : $frozenTime;
+        $frozenTime = match (true) {
+            $frozenTime instanceof DateTimeInterface => $frozenTime->format(DateTimeInterface::ATOM),
+            is_int($frozenTime) => gmdate(DateTimeInterface::ATOM, $frozenTime),
+            default => $frozenTime,
+        };
 
         return $this->requestResource('POST', "test-clocks/{$id}/advance", ['frozen_time' => $frozenTime], $opts);
     }

@@ -103,6 +103,18 @@ it('maps errors to exceptions', function (int $status, string $code, string $cla
     [500, 'server_error', ApiException::class],
 ]);
 
+it('advances test clocks with ISO 8601 times', function (int|string|DateTimeInterface $time) {
+    Http::fake(['*' => Http::response(['data' => ['id' => 'clock_1', 'type' => 'test-clocks', 'attributes' => []]])]);
+
+    Ridley::client()->testClocks()->advance('clock_1', $time);
+
+    Http::assertSent(fn (Request $request) => $request['frozen_time'] === '2026-11-11T20:06:11+00:00');
+})->with([
+    'timestamp' => [1794427571],
+    'DateTime' => [new DateTimeImmutable('2026-11-11T20:06:11+00:00')],
+    'string' => ['2026-11-11T20:06:11+00:00'],
+]);
+
 it('returns raw PDF bytes', function () {
     Http::fake(['*/invoices/in_1/pdf' => Http::response('%PDF-1.4 bytes', 200, ['Content-Type' => 'application/pdf'])]);
 

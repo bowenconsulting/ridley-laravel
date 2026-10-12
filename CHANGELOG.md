@@ -12,6 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-12
+
+### Fixed
+
+- Subscription dates (`trial_ends_at`, `current_period_end`, `ends_at`, …) were stored hours off when Ridley's offset differed from the app's timezone. Ridley timestamps are now converted to the app's timezone before saving.
+- `testClocks()->advance()` sends ISO 8601, which Ridley requires, instead of a Unix timestamp.
+
 ## [0.1.3] - 2026-10-12
 
 ### Added

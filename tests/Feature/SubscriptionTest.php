@@ -163,3 +163,14 @@ it('reads invoices for the subscription', function () {
     expect($this->subscription->invoices())->toHaveCount(1)
         ->and($this->subscription->upcomingInvoice()?->total())->toBe('$49.00');
 });
+
+it('stores Ridley timestamps in the app timezone, whatever their offset', function () {
+    $this->subscription->syncFromRidley([
+        'status' => 'trialing',
+        'trial_end' => '2026-11-11T15:06:11-05:00',
+        'current_period_end' => '2026-11-11T15:06:11-05:00',
+    ]);
+
+    expect($this->subscription->fresh()->trial_ends_at->toIso8601String())->toBe('2026-11-11T20:06:11+00:00')
+        ->and($this->subscription->fresh()->current_period_end->toIso8601String())->toBe('2026-11-11T20:06:11+00:00');
+});
