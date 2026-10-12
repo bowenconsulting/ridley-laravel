@@ -12,9 +12,11 @@ use Illuminate\Routing\Controller;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Ridley\Laravel\Exceptions\CardException;
 use Ridley\Laravel\Exceptions\CurrencyLocked;
 use Ridley\Laravel\Exceptions\IncompletePayment;
 use Ridley\Laravel\Exceptions\PriceNotFound;
+use Ridley\Laravel\Exceptions\RidleyException;
 use Ridley\Laravel\Price;
 use Ridley\Laravel\Resources\Invoice;
 use Ridley\Laravel\Resources\Payment;
@@ -32,9 +34,34 @@ use Symfony\Component\HttpFoundation\Response;
  * {@see Ridley::afterActionRedirect()}) with a flashed `status`. Hosted pages
  * (checkout, portal) answer 409 + Location for JSON, `Inertia::location` for
  * Inertia requests and a plain redirect otherwise.
+ *
+ * A Ridley API failure is a `billing` validation error rather than a server
+ * error: a card decline carries Ridley's message, anything else is reported
+ * and shown as a generic one.
  */
 class BillingController extends Controller
 {
+    public const UNAVAILABLE_MESSAGE = 'Billing is unavailable right now. Please try again in a moment.';
+
+    /**
+     * @param  string  $method
+     * @param  array<mixed>  $parameters
+     */
+    public function callAction($method, $parameters): mixed
+    {
+        try {
+            return parent::callAction($method, $parameters);
+        } catch (IncompletePayment $exception) {
+            throw $exception;
+        } catch (CardException $exception) {
+            throw ValidationException::withMessages(['billing' => $exception->getMessage() !== '' ? $exception->getMessage() : 'Your card was declined.']);
+        } catch (RidleyException $exception) {
+            report($exception);
+
+            throw ValidationException::withMessages(['billing' => self::UNAVAILABLE_MESSAGE]);
+        }
+    }
+
     public function subscribe(Request $request): Response
     {
         $billable = $this->billable($request, 'subscribe');

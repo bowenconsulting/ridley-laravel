@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Ridley\Laravel\Events\CatalogueSynced;
+use Ridley\Laravel\Exceptions\NotFoundException;
 use Ridley\Laravel\Exceptions\PriceNotFound;
 use Ridley\Laravel\Price;
 use Ridley\Laravel\Resources\Price as RidleyPrice;
@@ -458,7 +459,8 @@ class Catalogue
             ->latest('id')
             ->first();
 
-        if ($local !== null && $local->ridley_product_id !== null) {
+        // The cached product may belong to the other mode (a test key's product after switching to a live key)
+        if ($local !== null && $local->ridley_product_id !== null && $this->productExists($local->ridley_product_id)) {
             return $local->ridley_product_id;
         }
 
@@ -478,6 +480,17 @@ class Catalogue
             'name' => $definition->productName,
             'metadata' => $this->ridleyMetadata($definition),
         ])->id();
+    }
+
+    protected function productExists(string $productId): bool
+    {
+        try {
+            Ridley::client()->products()->retrieve($productId);
+
+            return true;
+        } catch (NotFoundException) {
+            return false;
+        }
     }
 
     /**

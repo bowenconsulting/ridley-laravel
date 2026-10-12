@@ -98,6 +98,22 @@ it('reuses a Ridley product found by metadata', function () {
         ->and($fake->all('products'))->toHaveCount(1);
 });
 
+it('makes a new product when the cached one is not in this mode', function () {
+    $fake = Ridley::fake();
+    Price::query()->forceCreate([
+        'ridley_price_id' => 'price_from_test_mode', 'ridley_product_id' => 'prod_from_test_mode', 'lookup_key' => 'plan.pro.usd.month',
+        'group' => 'plan', 'item_key' => 'pro', 'currency' => 'USD', 'interval' => 'month', 'interval_count' => 1, 'unit_amount' => 4900, 'is_current' => true,
+    ]);
+
+    Ridley::defineCatalogueUsing(fn () => [new PriceDefinition('plan', 'pro', 'Pro', 'USD', 'month', 4900)]);
+    Ridley::catalogue()->push();
+
+    $product = collect($fake->all('products'))->sole();
+
+    expect(Ridley::catalogue()->price('plan', 'pro', 'USD', 'month')->ridley_product_id)->toBe($product['id'])
+        ->and($fake->find(Ridley::catalogue()->price('plan', 'pro', 'USD', 'month')->ridley_price_id)['product'])->toBe($product['id']);
+});
+
 it('parses lookup keys, with and without a prefix', function () {
     expect(LookupKey::parse('plan.pro.usd.month'))->toBe(['group' => 'plan', 'item_key' => 'pro', 'currency' => 'USD', 'interval' => 'month', 'interval_count' => 1])
         ->and(LookupKey::parse('addon.extra.seat.jmd.3month'))->toBe(['group' => 'addon', 'item_key' => 'extra.seat', 'currency' => 'JMD', 'interval' => 'month', 'interval_count' => 3])

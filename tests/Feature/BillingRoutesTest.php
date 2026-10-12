@@ -132,6 +132,19 @@ it('redirects to hosted payment-method and portal pages', function () {
     $this->fake->assertCreated('portal-sessions');
 });
 
+it('turns a Ridley API failure into a billing error instead of a server error', function () {
+    $user = $this->user();
+    $this->fake->override(['POST sessions' => ['errors' => [['status' => '422', 'code' => 'gateway_unsupported', 'detail' => 'This payment gateway cannot save a card without a payment.']]]]);
+
+    $this->actingAs($user)->postJson(route('ridley.payment-method'))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['billing' => 'Billing is unavailable right now.']);
+
+    $this->actingAs($user)->from('/billing')->post(route('ridley.subscribe'), selection())
+        ->assertRedirect('/billing')
+        ->assertSessionHasErrors('billing');
+});
+
 it('lists and downloads only the billable\'s invoices', function () {
     $user = $this->customerWithCard();
     $mine = $this->fake->addInvoice(['customer' => $user->ridleyId()]);

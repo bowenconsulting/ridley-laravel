@@ -676,7 +676,7 @@ External redirects (checkout, portal, setup) work as follows:
 - JSON requests get a `409` with a `Location` header.
 - Other requests get a normal redirect.
 
-Validation errors are a standard `422` or back-with-errors.
+Validation errors are a standard `422` or back-with-errors. A failed Ridley API call is a validation error on `billing` too, never a server error: a card decline carries Ridley's message, and any other failure is reported (`report()`) and shown as "Billing is unavailable right now. Please try again in a moment." Show `errors.billing` wherever these actions are triggered.
 
 The prefix may contain route parameters, for example `'{account}/billing'`. Use the hooks to resolve the billable from them:
 

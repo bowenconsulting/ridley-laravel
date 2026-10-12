@@ -12,6 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-12
+
+### Fixed
+
+- The billing routes answer a failed Ridley API call with a `billing` validation error (a card decline's own message, or a generic one after reporting the exception) instead of a server error.
+- `ridley:push-catalogue` no longer reuses a product cached from the other mode (a test key's product after switching to a live key); it checks the product exists and otherwise finds or creates one.
+
 ## [0.2.0] - 2026-10-12
 
 Ridley now owns prices, as Stripe does. The app defines items (what it sells and what each one grants), and the package pulls the prices from Ridley.
