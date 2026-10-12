@@ -43,7 +43,17 @@ it('reports status helpers', function () {
 
     expect($subscription->pastDue())->toBeTrue()
         ->and($subscription->active())->toBeFalse()
+        ->and($subscription->live())->toBeTrue()
+        ->and($subscription->manageable())->toBeTrue()
         ->and(Subscription::query()->pastDue()->count())->toBe(1);
+
+    $subscription->forceFill(['ridley_status' => 'incomplete'])->save();
+
+    expect($subscription->live())->toBeTrue()->and($subscription->manageable())->toBeFalse();
+
+    $subscription->forceFill(['ridley_status' => 'incomplete_expired'])->save();
+
+    expect($subscription->live())->toBeFalse();
 });
 
 it('cancels at period end, resumes and cancels now', function () {

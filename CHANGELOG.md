@@ -12,6 +12,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-12
+
+### Added
+
+- `Subscription::live()` and `Subscription::manageable()`.
+
+### Fixed
+
+- The billing routes no longer start a second subscription when the billable's current one is past due, unpaid or waiting on its first payment.
+- Past-due and unpaid subscriptions can be previewed, changed and cancelled through the billing routes, as Ridley allows.
+
 ## [0.1.2] - 2026-10-12
 
 ### Added

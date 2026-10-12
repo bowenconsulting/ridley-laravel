@@ -431,6 +431,8 @@ $sub->active(); $sub->valid(); $sub->onTrial(); $sub->pastDue(); $sub->unpaid();
 $sub->incomplete(); $sub->canceled(); $sub->onGracePeriod(); $sub->ended();
 $sub->recurring(); $sub->paused(); $sub->hasPrice('price_...');
 $sub->hasCatalogueItem('plan', 'pro');
+$sub->live();        // still exists in Ridley, even if past due — change it rather than subscribe again
+$sub->manageable();  // can be changed or cancelled (live and not waiting on its first payment)
 
 $sub->catalogueKey('plan');            // 'pro'
 $sub->itemInGroup('plan');             // ?SubscriptionItem

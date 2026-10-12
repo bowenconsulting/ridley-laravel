@@ -106,6 +106,17 @@ it('previews, changes, cancels and resumes', function () {
     $this->postJson(route('ridley.subscription.resume'))->assertOk()->assertJsonPath('subscription.on_grace_period', false);
 });
 
+it('manages a past-due subscription instead of starting another', function () {
+    $user = $this->customerWithCard();
+    $this->actingAs($user)->postJson(route('ridley.subscribe'), selection())->assertOk();
+    $user->ridleySubscription()->forceFill(['ridley_status' => 'past_due'])->save();
+
+    $this->postJson(route('ridley.subscribe'), selection('professional'))->assertJsonValidationErrors('items');
+    $this->postJson(route('ridley.preview'), selection('professional'))->assertOk()->assertJsonPath('proration_behavior', 'always_invoice');
+    $this->putJson(route('ridley.subscription.update'), selection('professional'))->assertOk();
+    $this->deleteJson(route('ridley.subscription.cancel'))->assertOk();
+});
+
 it('fails to change without a subscription', function () {
     $this->actingAs($this->customerWithCard())->putJson(route('ridley.subscription.update'), selection())->assertUnprocessable();
 });

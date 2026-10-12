@@ -219,6 +219,26 @@ class Subscription extends Model
         return $this->ridley_status === self::STATUS_INCOMPLETE;
     }
 
+    /**
+     * Whether the subscription still exists in Ridley, whether or not it is in good standing
+     * (past-due, unpaid and incomplete subscriptions are live). A billable with a live
+     * subscription should change it rather than start another.
+     */
+    public function live(): bool
+    {
+        return ! $this->ended()
+            && ! in_array($this->ridley_status, [self::STATUS_INCOMPLETE_EXPIRED, self::STATUS_CANCELLED], true);
+    }
+
+    /**
+     * Whether the subscription can be changed or cancelled. As in Ridley, past-due and unpaid
+     * subscriptions can be, but one still waiting on its first payment cannot.
+     */
+    public function manageable(): bool
+    {
+        return $this->live() && ! $this->incomplete();
+    }
+
     public function hasIncompletePayment(): bool
     {
         return $this->pastDue() || $this->incomplete();

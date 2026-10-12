@@ -41,8 +41,14 @@ class BillingController extends Controller
         $data = $this->validateSelection($request, $billable, withType: true);
         $type = (string) ($data['type'] ?? 'default');
 
-        if ($billable->ridleySubscription($type)?->valid()) {
-            throw ValidationException::withMessages(['items' => 'You already have an active subscription; change it instead.']);
+        $existing = $billable->ridleySubscription($type);
+
+        if ($existing?->incomplete()) {
+            throw ValidationException::withMessages(['items' => 'Your subscription is waiting for its first payment; pay that invoice instead.']);
+        }
+
+        if ($existing?->live()) {
+            throw ValidationException::withMessages(['items' => 'You already have a subscription; change it instead.']);
         }
 
         try {
@@ -70,7 +76,7 @@ class BillingController extends Controller
         $data = $this->validateSelection($request, $billable, withType: true);
         $subscription = $billable->ridleySubscription((string) ($data['type'] ?? 'default'));
 
-        if ($subscription === null || ! $subscription->valid()) {
+        if ($subscription === null || ! $subscription->manageable()) {
             return response()->json($this->newSubscriptionPreview($data));
         }
 
@@ -85,7 +91,7 @@ class BillingController extends Controller
     {
         $billable = $this->billable($request, 'change');
         $data = $this->validateSelection($request, $billable, withType: true);
-        $subscription = $this->validSubscription($billable, (string) ($data['type'] ?? 'default'));
+        $subscription = $this->manageableSubscription($billable, (string) ($data['type'] ?? 'default'));
 
         try {
             $subscription->change($this->resolve($data, $subscription->currency ?? $data['currency']));
@@ -99,7 +105,7 @@ class BillingController extends Controller
     public function cancel(Request $request): Response
     {
         $billable = $this->billable($request, 'cancel');
-        $subscription = $this->validSubscription($billable, (string) $request->input('type', 'default'));
+        $subscription = $this->manageableSubscription($billable, (string) $request->input('type', 'default'));
 
         $subscription->cancel();
 
@@ -305,7 +311,7 @@ class BillingController extends Controller
         $currency = strtoupper((string) ($data['currency'] ?? '')) ?: $billable->billingCurrency();
         $subscription = $billable->ridleySubscription((string) ($data['type'] ?? 'default'));
 
-        if ($subscription?->valid() && $subscription->currency !== null) {
+        if ($subscription?->live() && $subscription->currency !== null) {
             $currency = $subscription->currency;
         }
 
@@ -367,11 +373,11 @@ class BillingController extends Controller
         }
     }
 
-    protected function validSubscription(Model $billable, string $type): Subscription
+    protected function manageableSubscription(Model $billable, string $type): Subscription
     {
         $subscription = $billable->ridleySubscription($type);
 
-        if ($subscription === null || ! $subscription->valid()) {
+        if ($subscription === null || ! $subscription->manageable()) {
             throw ValidationException::withMessages(['subscription' => 'There is no active subscription.']);
         }
 
