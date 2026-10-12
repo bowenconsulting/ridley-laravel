@@ -17,6 +17,8 @@ use Ridley\Laravel\Events;
 use Ridley\Laravel\Events\SubscriptionSynced;
 use Ridley\Laravel\Notifications;
 use Ridley\Laravel\Notifications\RidleyBillingNotification;
+use Ridley\Laravel\Resources\Price;
+use Ridley\Laravel\Ridley;
 use Ridley\Laravel\Subscription;
 use Ridley\Laravel\Support\SubscriptionMirror;
 use Symfony\Component\HttpFoundation\Response;
@@ -295,6 +297,50 @@ class WebhookController extends Controller
     protected function handleInvoiceUpcoming(array $payload): Response
     {
         event(new Events\InvoiceUpcoming($payload, $this->object($payload), $this->previous($payload), $this->resolveBillable($this->object($payload))));
+
+        return $this->successMethod();
+    }
+
+    // ---------------------------------------------------------------------
+    // Prices
+    // ---------------------------------------------------------------------
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handlePriceCreated(array $payload): Response
+    {
+        return $this->syncPrice($payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handlePriceUpdated(array $payload): Response
+    {
+        return $this->syncPrice($payload);
+    }
+
+    /**
+     * Mirror a price into the local catalogue, ignoring prices from the other mode.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function syncPrice(array $payload): Response
+    {
+        $object = $this->object($payload);
+        $object['id'] ??= $object['price_id'] ?? null;
+        $key = (string) config('ridley.key', '');
+
+        if (! is_string($object['id']) || $object['id'] === '') {
+            return $this->successMethod();
+        }
+
+        if (is_bool($object['livemode'] ?? null) && (str_starts_with($key, 'sk_live_') || str_starts_with($key, 'sk_test_')) && $object['livemode'] !== str_starts_with($key, 'sk_live_')) {
+            return $this->successMethod();
+        }
+
+        Ridley::catalogue()->syncPrice(new Price($object));
 
         return $this->successMethod();
     }

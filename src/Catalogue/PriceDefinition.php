@@ -8,7 +8,8 @@ use InvalidArgumentException;
 use Ridley\Laravel\Support\Money;
 
 /**
- * A recurring price the app sells, synced to Ridley by `ridley:sync-catalogue`.
+ * A recurring price to create on Ridley with `ridley:push-catalogue` (a one-off bootstrap;
+ * afterwards manage prices in Ridley and pull them with `ridley:sync-catalogue`).
  */
 final readonly class PriceDefinition
 {
@@ -51,9 +52,7 @@ final readonly class PriceDefinition
 
     public static function defaultLookupKey(string $group, string $itemKey, string $currency, string $interval, int $intervalCount = 1): string
     {
-        $every = $intervalCount > 1 ? $intervalCount.$interval : $interval;
-
-        return "{$group}.{$itemKey}.".strtolower($currency).".{$every}";
+        return LookupKey::make($group, $itemKey, $currency, $interval, $intervalCount);
     }
 
     /**

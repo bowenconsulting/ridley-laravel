@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Ridley\Laravel\Catalogue\Catalogue;
+use Ridley\Laravel\Catalogue\ItemDefinition;
 use Ridley\Laravel\Catalogue\PriceDefinition;
 use Ridley\Laravel\Client\RidleyClient;
 use Ridley\Laravel\Exceptions\NotFoundException;
@@ -66,6 +67,11 @@ final class Ridley
     protected static $catalogueResolver = null;
 
     /**
+     * @var (callable(): iterable<int, array<string, mixed>|ItemDefinition>)|null
+     */
+    protected static $itemsResolver = null;
+
+    /**
      * @var (Closure(Request): (Model|null))|null
      */
     protected static ?Closure $billableResolver = null;
@@ -117,6 +123,25 @@ final class Ridley
     public static function catalogueResolver(): ?callable
     {
         return self::$catalogueResolver;
+    }
+
+    /**
+     * Register a resolver returning the items the app sells and what they grant
+     * (in addition to config `ridley.catalogue`). Prices come from Ridley.
+     *
+     * @param  callable(): iterable<int, array<string, mixed>|ItemDefinition>  $resolver
+     */
+    public static function defineItemsUsing(callable $resolver): void
+    {
+        self::$itemsResolver = $resolver;
+    }
+
+    /**
+     * @return (callable(): iterable<int, array<string, mixed>|ItemDefinition>)|null
+     */
+    public static function itemsResolver(): ?callable
+    {
+        return self::$itemsResolver;
     }
 
     /**
@@ -449,6 +474,7 @@ final class Ridley
         self::$registersRoutes = true;
         self::$keepPastDueActive = false;
         self::$catalogueResolver = null;
+        self::$itemsResolver = null;
         self::$billableResolver = null;
         self::$authorizer = null;
         self::$redirector = null;

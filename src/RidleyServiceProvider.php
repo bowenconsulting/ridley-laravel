@@ -11,6 +11,7 @@ use Ridley\Laravel\Catalogue\Catalogue;
 use Ridley\Laravel\Client\RidleyClient;
 use Ridley\Laravel\Console\DoctorCommand;
 use Ridley\Laravel\Console\InstallCommand;
+use Ridley\Laravel\Console\PushCatalogueCommand;
 use Ridley\Laravel\Console\SyncCatalogueCommand;
 use Ridley\Laravel\Console\WebhookCommand;
 use Ridley\Laravel\Http\Middleware\EnsureFeature;
@@ -40,6 +41,7 @@ class RidleyServiceProvider extends ServiceProvider
             $this->commands([
                 InstallCommand::class,
                 DoctorCommand::class,
+                PushCatalogueCommand::class,
                 SyncCatalogueCommand::class,
                 WebhookCommand::class,
             ]);

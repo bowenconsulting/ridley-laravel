@@ -150,30 +150,31 @@ class DoctorCommand extends Command
     protected function checkCatalogue(): void
     {
         try {
-            $definitions = Ridley::catalogue()->definitions();
-            $drift = $definitions->isEmpty() ? [] : Ridley::catalogue()->drift();
+            $items = Ridley::catalogue()->items();
+            $drift = Ridley::catalogue()->drift();
+            $prices = Ridley::catalogue()->prices()->count();
         } catch (Throwable $exception) {
             $this->failCheck('Catalogue', $exception->getMessage());
 
             return;
         }
 
-        if ($definitions->isEmpty()) {
-            $this->warnCheck('Catalogue', 'No catalogue defined.');
+        if ($items->isEmpty() && $prices === 0) {
+            $this->warnCheck('Catalogue', 'No items defined and no prices synced; run `php artisan ridley:sync-catalogue`.');
 
             return;
         }
 
         if ($drift === []) {
-            $this->passCheck('Catalogue', "{$definitions->count()} price(s) in sync.");
+            $this->passCheck('Catalogue', "{$items->count()} item(s), {$prices} current price(s).");
 
             return;
         }
 
-        $this->failCheck('Catalogue', count($drift).' price(s) out of sync; run `php artisan ridley:sync-catalogue`.');
+        $this->failCheck('Catalogue', count($drift).' item(s) without a current price; add them on Ridley, then run `php artisan ridley:sync-catalogue`.');
 
         foreach ($drift as $entry) {
-            $this->line("      <fg=gray>{$entry['lookup_key']}: {$entry['reason']}</>");
+            $this->line("      <fg=gray>{$entry['item']}: {$entry['reason']}</>");
         }
     }
 

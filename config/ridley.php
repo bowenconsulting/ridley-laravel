@@ -53,6 +53,8 @@ return [
             'invoice.upcoming',
             'payment.completed',
             'payment.failed',
+            'price.created',
+            'price.updated',
         ],
     ],
 
@@ -104,23 +106,28 @@ return [
     | Catalogue
     |--------------------------------------------------------------------------
     |
-    | What you sell, synced to Ridley by `php artisan ridley:sync-catalogue`:
-    | [group => [item_key => [name, prices: [[currency, interval,
-    | interval_count?, amount]], features?, limits?, max_quantity?, metadata?]]].
-    | A flat list under `prices` (group, item_key, product_name, currency,
-    | interval, unit_amount in minor units, …) is also accepted. Definitions
-    | from Ridley::defineCatalogueUsing() are merged in and win on conflicts.
+    | Prices live on Ridley; `php artisan ridley:sync-catalogue` (and the
+    | price.* webhooks) mirror them locally. A price belongs to an item by its
+    | lookup key: `[{prefix}.]{group}.{item}.{currency}.{every}`, e.g.
+    | `acme.plan.starter.usd.month` or `acme.addon.extra_seat.usd.3month`.
+    |
+    | Set a prefix when several apps share one Ridley account, so each only
+    | imports its own prices.
+    |
+    | Under `catalogue`, define what each item grants: [group => [item_key =>
+    | [name, features?, limits?, max_quantity?]]]. Ridley::defineItemsUsing()
+    | adds items at runtime. When items are defined, Ridley prices for other
+    | items are skipped. Optional `prices` per item are only used by
+    | `ridley:push-catalogue` to create the first prices on a fresh account.
     |
     */
+
+    'catalogue_prefix' => env('RIDLEY_CATALOGUE_PREFIX'),
 
     'catalogue' => [
         // 'plan' => [
         //     'starter' => [
         //         'name' => 'Starter',
-        //         'prices' => [
-        //             ['currency' => 'USD', 'interval' => 'month', 'amount' => '19.00'],
-        //             ['currency' => 'USD', 'interval' => 'year', 'amount' => '190.00'],
-        //         ],
         //         'features' => ['reports'],
         //         'limits' => ['seats' => 3, 'projects' => null], // null = unlimited
         //     ],
@@ -128,7 +135,6 @@ return [
         // 'addon' => [
         //     'extra_seat' => [
         //         'name' => 'Extra seat',
-        //         'prices' => [['currency' => 'USD', 'interval' => 'month', 'amount' => '5.00']],
         //         'limits' => ['seats' => 1], // multiplied by quantity
         //         'max_quantity' => 50,
         //     ],

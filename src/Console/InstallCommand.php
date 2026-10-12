@@ -68,7 +68,7 @@ class InstallCommand extends Command
         $this->components->bulletList([
             "Add the <comment>Ridley\\Laravel\\Billable</comment> trait to {$model}.",
             'Set <comment>RIDLEY_SECRET</comment> in .env, then run <comment>php artisan migrate</comment>.',
-            'Define your catalogue in config/ridley.php and run <comment>php artisan ridley:sync-catalogue</comment>.',
+            'Define your catalogue items in config/ridley.php, add prices on Ridley (or run <comment>php artisan ridley:push-catalogue</comment>), then <comment>php artisan ridley:sync-catalogue</comment>.',
             'Create the webhook endpoint with <comment>php artisan ridley:webhook</comment> and set <comment>RIDLEY_WEBHOOK_SECRET</comment>.',
             'Run <comment>php artisan ridley:doctor</comment> to check everything.',
         ]);

@@ -100,7 +100,7 @@ abstract class TestCase extends Orchestra
     {
         config(['ridley.catalogue' => $this->catalogueConfig()]);
 
-        Ridley::catalogue()->sync();
+        Ridley::catalogue()->push();
     }
 
     /**

@@ -28,7 +28,7 @@ Requirements: PHP 8.3+, Laravel 12 or 13.
 
 ## Minimal product in 10 minutes
 
-This walkthrough uses only the config catalogue, the headless routes and the Ridley customer portal. You write no billing code.
+This walkthrough uses the config catalogue, the headless routes and the Ridley customer portal. You write no billing code.
 
 ```bash
 composer require ridley/ridley-laravel
@@ -55,7 +55,7 @@ RIDLEY_ROUTES=true
 RIDLEY_BILLING_URL=/billing
 ```
 
-Describe what you sell in `config/ridley.php`:
+Describe what you sell, and what each item grants, in `config/ridley.php`. The `prices` here are only a starting point for a fresh Ridley account; after the first push, prices are managed on Ridley:
 
 ```php
 'catalogue' => [
@@ -79,10 +79,10 @@ Describe what you sell in `config/ridley.php`:
 ],
 ```
 
-Push the catalogue to Ridley, register the webhook endpoint (this prints the signing secret for `RIDLEY_WEBHOOK_SECRET`) and check the setup:
+Create the prices on Ridley, register the webhook endpoint (this prints the signing secret for `RIDLEY_WEBHOOK_SECRET`) and check the setup:
 
 ```bash
-php artisan ridley:sync-catalogue
+php artisan ridley:push-catalogue
 php artisan ridley:webhook --url=https://your-app.example.com/ridley/webhook
 php artisan ridley:doctor
 ```
@@ -149,7 +149,7 @@ To ship your own migrations instead, call `Ridley::ignoreMigrations()` in a serv
 - the webhook secret is set;
 - the webhook route is registered;
 - the billable model uses the trait and its table has the columns;
-- the catalogue is in sync (drift is reported).
+- every defined catalogue item has a current price (items without one are listed).
 
 Run it in CI or after deploys.
 
@@ -171,7 +171,8 @@ Run it in CI or after deploys.
 | `ridley.tables.subscriptions` / `subscription_items` / `webhook_events` / `prices` | – | `ridley_*` | Package table names |
 | `ridley.proration.increase` | `RIDLEY_PRORATION_INCREASE` | `always_invoice` | Proration for upgrades in `change()` |
 | `ridley.proration.decrease` | `RIDLEY_PRORATION_DECREASE` | `create_prorations` | Proration for downgrades in `change()` |
-| `ridley.catalogue` | – | `[]` | Static catalogue ([Catalogue](#catalogue)) |
+| `ridley.catalogue` | – | `[]` | Items and what they grant ([Catalogue](#catalogue)) |
+| `ridley.catalogue_prefix` | `RIDLEY_CATALOGUE_PREFIX` | – | Lookup key prefix when several apps share a Ridley account |
 | `ridley.notifications.enabled` | `RIDLEY_NOTIFICATIONS` | `false` | Send dunning emails |
 | `ridley.notifications.billing_url` | `RIDLEY_BILLING_URL` | – | Fallback action URL in emails |
 | `ridley.billing_url` | `RIDLEY_BILLING_URL` | – | Where the middleware redirects customers without access |
@@ -192,87 +193,108 @@ Ridley::usePriceModel(MyPrice::class);
 
 `Ridley::keepPastDueSubscriptionsActive()` makes `past_due` subscriptions count as active. `Ridley::ignoreRoutes()` disables every package route, including the webhook route.
 
-**Octane:** hooks such as `defineCatalogueUsing`, `resolveBillableUsing`, `authorizeUsing`, `afterActionRedirect` and `sellableUsing` are boot-time registrations. Register them in a service provider, never per request. The package keeps no request state in statics or singletons.
+**Octane:** hooks such as `defineItemsUsing`, `defineCatalogueUsing`, `resolveBillableUsing`, `authorizeUsing`, `afterActionRedirect` and `sellableUsing` are boot-time registrations. Register them in a service provider, never per request. The package keeps no request state in statics or singletons.
 
 ## Catalogue
 
-The catalogue describes what you sell. `php artisan ridley:sync-catalogue` pushes it to Ridley and records the result in the local `ridley_prices` table, which maps Ridley price IDs back to `group` and `item_key` (for example `plan` / `pro`).
+Like Stripe, **Ridley owns prices**. The app defines its **items** (what it sells and what each one grants), and the package mirrors Ridley's prices into the local `ridley_prices` table, mapping each price ID to a `group` and `item_key` (for example `plan` / `pro`).
 
-Define it statically in config:
+A Ridley price belongs to an item through its **lookup key**:
+
+```
+[{prefix}.]{group}.{item_key}.{currency}.{every}
+```
+
+For example `plan.pro.usd.month`, `addon.extra_seat.jmd.year` or `plan.pro.usd.3month` (every 3 months). Set `RIDLEY_CATALOGUE_PREFIX` (e.g. `acme`, giving `acme.plan.pro.usd.month`) when several apps share one Ridley account, so each imports only its own prices.
+
+### Items
+
+Define items in config:
 
 ```php
 'catalogue' => [
     'plan' => [
         'pro' => [
             'name' => 'Pro',
-            'prices' => [
-                ['currency' => 'USD', 'interval' => 'month', 'amount' => '49.00'],
-                ['currency' => 'USD', 'interval' => 'month', 'interval_count' => 3, 'amount' => '135.00'],
-                ['currency' => 'EUR', 'interval' => 'month', 'amount' => '45.00'],
-            ],
             'features' => ['reports', 'api'],
-            'limits' => ['seats' => 10, 'projects' => null],
-            'metadata' => ['tier' => 'pro'],
+            'limits' => ['seats' => 10, 'projects' => null], // null = unlimited
         ],
     ],
     'addon' => [
         'extra_seat' => [
             'name' => 'Extra seat',
-            'prices' => [['currency' => 'USD', 'interval' => 'month', 'amount' => '5.00']],
-            'limits' => ['seats' => 1],
+            'limits' => ['seats' => 1], // multiplied by quantity
             'max_quantity' => 50,
         ],
     ],
 ],
 ```
 
-Or define it at runtime, for example when amounts live in your database. The config may be cached, so closures don't belong there:
+Or at runtime, in a service provider (the config may be cached, so closures don't belong there):
 
 ```php
-use Ridley\Laravel\Catalogue\PriceDefinition;
+use Ridley\Laravel\Catalogue\ItemDefinition;
 
-Ridley::defineCatalogueUsing(fn () => Plan::all()->map(fn (Plan $plan) => new PriceDefinition(
+Ridley::defineItemsUsing(fn () => Plan::all()->map(fn (Plan $plan) => new ItemDefinition(
     group: 'plan',
-    itemKey: $plan->slug,
-    productName: $plan->name,
-    currency: 'USD',
-    interval: 'month',
-    unitAmount: $plan->price_cents,   // minor units
+    key: $plan->slug,
+    name: $plan->name,
     features: $plan->features,
     limits: ['projects' => $plan->max_projects],
 )));
 ```
 
-The resolver may return `PriceDefinition` objects or arrays accepted by `PriceDefinition::fromArray()`. When both sources define the same lookup key, the resolver wins. A flat list under `ridley.catalogue.prices` is also accepted.
+The resolver may also return arrays accepted by `ItemDefinition::fromArray()`, and wins over config. When at least one item is defined, Ridley prices for undefined items are skipped (and reported). With no items, every price with a conventional lookup key is imported, without entitlements.
 
-Each price gets a lookup key, `{group}.{item_key}.{currency}.{interval}` (for example `plan.pro.usd.month`), or `…{count}{interval}` when `interval_count > 1`.
-
-### Syncing
+### Syncing from Ridley
 
 ```bash
-php artisan ridley:sync-catalogue            # creates/replaces prices and prints a table
-php artisan ridley:sync-catalogue --dry-run  # shows would_create / would_replace only
+php artisan ridley:sync-catalogue
 ```
 
-For each definition, the sync finds the Ridley price by lookup key:
+The sync lists the active recurring prices on Ridley and, for each one carrying this app's lookup key:
 
-- **Unchanged:** the amount, currency and interval match, so the price is only recorded locally.
-- **Replaced:** the amount or interval changed, so a new price is created on the same product and the lookup key is transferred to it.
+- **Imported / updated / unchanged:** the price becomes the current price for its item, currency and interval. Features, limits and `max_quantity` come from the item.
+- **Skipped:** the lookup key is malformed, doesn't match the price's currency or interval, or names an undefined item. The note says which.
+
+Local prices Ridley no longer sells (archived, or the lookup key moved to another price) are **retired**: kept with `is_current = false`, so existing subscribers still map to their item and keep their entitlements. Item changes reach retired prices too.
+
+Register the `price.created` and `price.updated` webhooks (in the default `ridley.webhook.events`), and the catalogue stays in step without running the command. Each sync fires `Ridley\Laravel\Events\CatalogueSynced` with the `SyncResult`s, so you can refresh anything derived from prices, such as a public pricing page.
+
+### Changing a price
+
+A Ridley price's amount and interval never change. To change what new customers pay, create a new price on Ridley with the same lookup key and choose to **take the lookup key over** (dashboard) or pass `transfer_lookup_key` (API). The webhook retires the old price locally. Existing subscribers stay on their old price, like Stripe, until you move them (for example with `swap()`).
+
+### Bootstrapping a fresh account
+
+`ridley:push-catalogue` creates prices on Ridley from price definitions: `prices` on config items, a flat list under `ridley.catalogue.prices`, or `Ridley::defineCatalogueUsing()` returning `PriceDefinition`s. It is a one-off convenience, and Ridley stays the source of truth:
+
+```bash
+php artisan ridley:push-catalogue            # creates missing prices, then syncs
+php artisan ridley:push-catalogue --dry-run  # shows would_create only
+php artisan ridley:push-catalogue --replace  # also replaces Ridley prices that differ
+```
+
+For each definition the push finds the Ridley price by lookup key:
+
+- **Unchanged:** it matches, so it is only recorded locally.
+- **Differs:** Ridley has a different amount or interval and is left alone, unless `--replace` creates a new price and transfers the lookup key to it.
 - **Created:** there is no price yet, so the price is created on an existing product (matched via the `ridley_laravel_group` / `ridley_laravel_item` metadata) or a new product.
 
-Old prices are never deactivated. They remain in `ridley_prices` with `is_current = false`, so existing subscribers still map to their plan.
+Old Ridley prices are never deactivated.
 
 ### Looking prices up
 
 ```php
 $catalogue = Ridley::catalogue();
 
-$catalogue->definitions();                                   // Collection<PriceDefinition>
+$catalogue->items();                                         // Collection<ItemDefinition>, keyed group.key
+$catalogue->item('plan', 'pro');                             // ?ItemDefinition
 $catalogue->price('plan', 'pro', 'USD', 'month');            // ?Price (current)
 $catalogue->priceOrFail('plan', 'pro', 'USD', 'month');      // Price or PriceNotFound
 $catalogue->findByRidleyId('price_...');                     // ?Price (current or retired)
 $catalogue->prices('plan', 'USD', 'month');                  // Collection<Price>
-$catalogue->drift();                                         // definitions missing/out of date locally
+$catalogue->drift();                                         // items without a current price
 
 $catalogue->resolve('USD', 'month', [
     ['group' => 'plan', 'key' => 'pro'],
@@ -795,7 +817,7 @@ use Ridley\Laravel\Ridley;
 
 it('subscribes to pro', function () {
     $fake = Ridley::fake();
-    Artisan::call('ridley:sync-catalogue');
+    Artisan::call('ridley:push-catalogue'); // or $fake->addPrice(['lookup_key' => 'plan.pro.usd.month', 'unit_amount' => '49.00']) and sync
 
     $user = User::factory()->create();
     $fake->addPaymentMethod($user->createOrGetRidleyCustomer()->id());

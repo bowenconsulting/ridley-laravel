@@ -12,6 +12,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
+Ridley now owns prices, as Stripe does. The app defines items (what it sells and what each one grants), and the package pulls the prices from Ridley.
+
+### Breaking
+
+- `php artisan ridley:sync-catalogue` and `Catalogue::sync()` now **pull** prices from Ridley instead of pushing definitions. The old push is `ridley:push-catalogue` / `Catalogue::push()`, and it no longer replaces Ridley prices that differ unless you pass `--replace` / `replace: true`.
+- Prices map to items by lookup key, `[{prefix}.]{group}.{item}.{currency}.{every}`. Prices pushed by 0.1 already follow it. Prices created by hand on Ridley need such a lookup key.
+- `Catalogue::drift()` returns `[{item, reason}]` for items without a current price, instead of `[{lookup_key, reason}]` for definitions out of date.
+- `price.created` and `price.updated` are added to the default `ridley.webhook.events`. Re-run `php artisan ridley:webhook --url=…` to subscribe an existing endpoint.
+
+### Added
+
+- `ItemDefinition` and `Ridley::defineItemsUsing()`; `Catalogue::items()`, `item()`, `syncPrice()` and `applyItems()`.
+- `ridley.catalogue_prefix` (`RIDLEY_CATALOGUE_PREFIX`) for apps sharing one Ridley account, and `Catalogue\LookupKey`.
+- `price.created` / `price.updated` webhook handling, and the `CatalogueSynced` event.
+- `SyncResult` actions `imported`, `updated`, `retired`, `skipped` and `differs`, and `SyncResult::$note`.
+- `FakeRidley` filters prices by `type`.
+
+### Upgrading
+
+1. Move features, limits and `max_quantity` you defined only in `defineCatalogueUsing()` to `defineItemsUsing()` (definitions still supply items, so this is optional).
+2. Run `php artisan ridley:webhook --url=…` to add the price events, then `php artisan ridley:sync-catalogue`.
+3. Manage amounts on Ridley from now on.
+
 ## [0.1.4] - 2026-10-12
 
 ### Fixed

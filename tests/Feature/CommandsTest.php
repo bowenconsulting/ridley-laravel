@@ -72,7 +72,7 @@ describe('ridley:doctor', function () {
 
         $this->artisan('ridley:doctor')
             ->expectsOutputToContain('Connected')
-            ->expectsOutputToContain('6 price(s) in sync')
+            ->expectsOutputToContain('3 item(s), 6 current price(s)')
             ->assertSuccessful();
     });
 
@@ -82,12 +82,12 @@ describe('ridley:doctor', function () {
         config(['ridley.webhook.secret' => null]);
 
         $catalogue = $this->catalogueConfig();
-        $catalogue['plan']['starter']['prices'][0]['amount'] = '29.00';
+        $catalogue['plan']['enterprise'] = ['name' => 'Enterprise'];
         config(['ridley.catalogue' => $catalogue]);
 
         $this->artisan('ridley:doctor')
             ->expectsOutputToContain('RIDLEY_WEBHOOK_SECRET is not set')
-            ->expectsOutputToContain('1 price(s) out of sync')
+            ->expectsOutputToContain('1 item(s) without a current price')
             ->assertFailed();
     });
 

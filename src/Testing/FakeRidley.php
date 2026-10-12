@@ -539,7 +539,7 @@ class FakeRidley
         }
 
         return $this->crud('prices', 'price', $method, $id, $params, function (array $price) use ($params) {
-            foreach (['lookup_key', 'product', 'currency'] as $filter) {
+            foreach (['lookup_key', 'product', 'currency', 'type'] as $filter) {
                 $value = Arr::get($params, "filter.{$filter}");
 
                 if ($value !== null && (string) ($price[$filter] ?? '') !== (string) $value) {
