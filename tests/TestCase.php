@@ -115,6 +115,14 @@ abstract class TestCase extends Orchestra
         return $user->updateDefaultPaymentMethodFromRidley();
     }
 
+    protected function userWithRidleyId(string $ridleyId): User
+    {
+        $user = $this->user();
+        $user->updateRidleyCustomerRecord(['ridley_id' => $ridleyId]);
+
+        return $user;
+    }
+
     protected function user(array $attributes = []): User
     {
         return User::query()->create(array_merge([

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Ridley\Laravel\Console;
 
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Ridley\Laravel\Billable;
@@ -19,13 +18,6 @@ class DoctorCommand extends Command
     protected $signature = 'ridley:doctor';
 
     protected $description = 'Check the Ridley configuration, database and catalogue';
-
-    /**
-     * Columns the Billable trait expects on the billable table.
-     *
-     * @var list<string>
-     */
-    public const array BILLABLE_COLUMNS = ['ridley_customer_id', 'pm_brand', 'pm_last_four', 'pm_exp_month', 'pm_exp_year', 'ridley_currency', 'trial_ends_at'];
 
     protected int $failures = 0;
 
@@ -108,29 +100,13 @@ class DoctorCommand extends Command
         } else {
             $this->passCheck('Billable model', $model);
         }
-
-        /** @var Model $instance */
-        $instance = new $model;
-
-        try {
-            $required = config('ridley.trial.generic', true) ? self::BILLABLE_COLUMNS : array_diff(self::BILLABLE_COLUMNS, ['trial_ends_at']);
-            $missing = array_values(array_diff($required, Schema::connection($instance->getConnectionName())->getColumnListing($instance->getTable())));
-        } catch (Throwable $exception) {
-            $this->failCheck('Billable columns', $exception->getMessage());
-
-            return;
-        }
-
-        $missing === []
-            ? $this->passCheck('Billable columns', "{$instance->getTable()} has the Ridley columns.")
-            : $this->failCheck('Billable columns', "{$instance->getTable()} is missing: ".implode(', ', $missing).'. Run the migrations.');
     }
 
     protected function checkTables(): void
     {
         $missing = [];
 
-        foreach (['subscriptions', 'subscription_items', 'webhook_events', 'prices'] as $key) {
+        foreach (['customers', 'subscriptions', 'subscription_items', 'webhook_events', 'prices'] as $key) {
             $table = (string) config("ridley.tables.{$key}");
 
             try {

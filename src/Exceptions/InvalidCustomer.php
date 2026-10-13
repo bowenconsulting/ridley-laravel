@@ -22,6 +22,6 @@ class InvalidCustomer extends Exception
      */
     public static function exists(Model $owner): static
     {
-        return new static(class_basename($owner)." is already a Ridley customer with ID {$owner->getAttribute('ridley_customer_id')}.");
+        return new static(class_basename($owner)." is already a Ridley customer with ID {$owner->ridleyId()}.");
     }
 }

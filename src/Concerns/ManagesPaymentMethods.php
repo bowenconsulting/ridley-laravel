@@ -57,7 +57,7 @@ trait ManagesPaymentMethods
      */
     public function hasDefaultPaymentMethod(): bool
     {
-        return $this->getAttribute('pm_last_four') !== null;
+        return (bool) $this->ridleyCustomer?->hasDefaultPaymentMethod();
     }
 
     /**
@@ -71,13 +71,13 @@ trait ManagesPaymentMethods
 
         $method = Ridley::client()->paymentMethods()->retrieve($paymentMethod);
 
-        $this->fillPaymentMethodDetails($method)->save();
+        $this->storePaymentMethodDetails($method);
 
         return $method;
     }
 
     /**
-     * Refresh the local pm_* columns from the customer's default card on Ridley.
+     * Refresh the locally stored default card from the customer's default card on Ridley.
      */
     public function updateDefaultPaymentMethodFromRidley(): static
     {
@@ -103,35 +103,30 @@ trait ManagesPaymentMethods
             }
         }
 
-        $this->fillPaymentMethodDetails($method);
-
-        if ($this->isDirty()) {
-            $this->save();
-        }
+        $this->storePaymentMethodDetails($method);
 
         return $this;
     }
 
     /**
-     * @return $this
+     * Store the default card's display details (brand, last four, expiry) on the customer record.
      */
-    protected function fillPaymentMethodDetails(?PaymentMethod $method): static
+    protected function storePaymentMethodDetails(?PaymentMethod $method): void
     {
-        if ($method === null || $method->detached) {
-            return $this->forceFill([
-                'pm_brand' => null,
-                'pm_last_four' => null,
-                'pm_exp_month' => null,
-                'pm_exp_year' => null,
-            ]);
+        $details = $method === null || $method->detached
+            ? ['pm_brand' => null, 'pm_last_four' => null, 'pm_exp_month' => null, 'pm_exp_year' => null]
+            : [
+                'pm_brand' => $method->brand(),
+                'pm_last_four' => $method->lastFour(),
+                'pm_exp_month' => $method->exp_month !== null ? (int) $method->exp_month : null,
+                'pm_exp_year' => $method->exp_year !== null ? (int) $method->exp_year : null,
+            ];
+
+        if ($this->ridleyCustomer === null && $details['pm_last_four'] === null) {
+            return;
         }
 
-        return $this->forceFill([
-            'pm_brand' => $method->brand(),
-            'pm_last_four' => $method->lastFour(),
-            'pm_exp_month' => $method->exp_month !== null ? (int) $method->exp_month : null,
-            'pm_exp_year' => $method->exp_year !== null ? (int) $method->exp_year : null,
-        ]);
+        $this->updateRidleyCustomerRecord($details);
     }
 
     /**
@@ -147,7 +142,7 @@ trait ManagesPaymentMethods
 
         Ridley::client()->paymentMethods()->delete($paymentMethod);
 
-        if ($method->is_default || $this->getAttribute('pm_last_four') === $method->lastFour()) {
+        if ($method->is_default || $this->ridleyCustomer?->pm_last_four === $method->lastFour()) {
             $this->updateDefaultPaymentMethodFromRidley();
         }
     }

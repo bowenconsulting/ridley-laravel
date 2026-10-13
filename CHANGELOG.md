@@ -12,6 +12,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-13
+
+This release adds a migration.
+
+### Breaking
+
+- Customer state moved off the billable table into a polymorphic `ridley_customers` table (`Ridley\Laravel\Customer`, reached through `$billable->ridleyCustomer`), like Cashier Paddle. It holds the Ridley ID (`ridley_id`), the locked `currency`, the default card's `pm_*` display details and the generic `trial_ends_at`. The `add_ridley_columns_to_billable_table` migration is replaced by `create_ridley_customers_table`. Upgrading apps copy their billable's `ridley_customer_id`, `ridley_currency`, `pm_*` and (generic) `trial_ends_at` into the new table, then drop those columns.
+- Removed the `ridley.tables.billable` (`RIDLEY_BILLABLE_TABLE`) and `ridley.trial.generic` (`RIDLEY_GENERIC_TRIALS`) config keys and the `--table` option of `ridley:install`.
+- `ridley:doctor` checks for the `ridley_customers` table instead of billable columns.
+
+### Added
+
+- `Billable::ridleyCustomer()` and `Billable::updateRidleyCustomerRecord()`.
+- `Customer::hasDefaultPaymentMethod()`, `hasExpiredCard()`, `onGenericTrial()` and `hasExpiredGenericTrial()`.
+- `Ridley::useRidleyCustomerModel()` / `Ridley::ridleyCustomerModel()`.
+- `Ridley::findBillable()` resolves any billable model type through `ridley_customers`, not only `ridley.model`.
+
 ## [0.2.1] - 2026-10-12
 
 ### Fixed

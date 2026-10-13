@@ -87,7 +87,7 @@ it('accepts any of several rotated secrets', function () {
 
 it('creates, updates and deletes the local subscription mirror', function () {
     Event::fake([SubscriptionCreated::class, SubscriptionDeleted::class, SubscriptionSynced::class, WebhookReceived::class, WebhookHandled::class]);
-    $user = $this->user(['ridley_customer_id' => 'cus_1']);
+    $user = $this->userWithRidleyId('cus_1');
 
     $this->postRidleyWebhook('customer.subscription.created', subscriptionObject('cus_1'))->assertOk();
 
@@ -95,7 +95,7 @@ it('creates, updates and deletes the local subscription mirror', function () {
     expect($subscription->ridley_id)->toBe('sub_1')
         ->and($subscription->items)->toHaveCount(1)
         ->and($user->subscribed())->toBeTrue()
-        ->and($user->fresh()->ridley_currency)->toBe('USD');
+        ->and($user->fresh()->ridleyCustomer->currency)->toBe('USD');
 
     Event::assertDispatched(SubscriptionCreated::class, fn ($event) => $event->billable->is($user) && $event->subscription->is($subscription));
     Event::assertDispatched(SubscriptionSynced::class, fn ($event) => $event->source === 'webhook');
@@ -133,7 +133,7 @@ it('maps subscriptions via metadata when the customer is unknown', function () {
 
 it('ignores duplicate deliveries', function () {
     Event::fake([WebhookHandled::class]);
-    $this->user(['ridley_customer_id' => 'cus_1']);
+    $this->userWithRidleyId('cus_1');
 
     $this->postRidleyWebhook('customer.subscription.created', subscriptionObject('cus_1'), eventId: 'evt_1')->assertOk();
     $this->postRidleyWebhook('customer.subscription.created', subscriptionObject('cus_1'), eventId: 'evt_1')
@@ -143,7 +143,7 @@ it('ignores duplicate deliveries', function () {
 });
 
 it('accepts the legacy flat payload shape', function () {
-    $this->user(['ridley_customer_id' => 'cus_1']);
+    $this->userWithRidleyId('cus_1');
     $payload = json_encode(array_merge(['event_id' => 'evt_legacy', 'event' => 'customer.subscription.created'], subscriptionObject('cus_1')));
 
     $this->call('POST', route('ridley.webhook'), [], [], [], [
@@ -156,7 +156,8 @@ it('accepts the legacy flat payload shape', function () {
 
 it('works for billables that define their own subscription() relation', function () {
     config(['ridley.model' => Organization::class]);
-    $organization = Organization::query()->create(['name' => 'Acme', 'ridley_customer_id' => 'cus_org']);
+    $organization = Organization::query()->create(['name' => 'Acme']);
+    $organization->updateRidleyCustomerRecord(['ridley_id' => 'cus_org']);
     LegacyPlan::query()->create(['organization_id' => $organization->getKey(), 'name' => 'legacy']);
 
     expect($organization->subscription)->toBeInstanceOf(LegacyPlan::class)
@@ -182,7 +183,7 @@ it('works for billables that define their own subscription() relation', function
 
 it('dispatches typed invoice and payment events with purpose', function () {
     Event::fake([InvoicePaymentFailed::class, PaymentCompleted::class]);
-    $user = $this->user(['ridley_customer_id' => 'cus_1']);
+    $user = $this->userWithRidleyId('cus_1');
 
     $this->postRidleyWebhook('invoice.payment_failed', invoiceObject('cus_1'))->assertOk();
     Event::assertDispatched(InvoicePaymentFailed::class, fn ($event) => $event->billable->is($user)
@@ -204,7 +205,7 @@ it('dispatches typed invoice and payment events with purpose', function () {
 
 it('sends dunning notifications only when enabled', function () {
     Notification::fake();
-    $user = $this->user(['ridley_customer_id' => 'cus_1']);
+    $user = $this->userWithRidleyId('cus_1');
 
     $this->postRidleyWebhook('invoice.payment_failed', invoiceObject('cus_1'), eventId: 'evt_a')->assertOk();
     Notification::assertNothingSent();
@@ -246,4 +247,16 @@ it('links notifications to the billable\'s own billing url', function () {
         ->toMail($user);
 
     expect((string) $mail->render())->toContain("https://app.example.com/accounts/{$user->getKey()}/billing");
+});
+
+it('clears the customer record when the Ridley customer is deleted', function () {
+    $user = $this->userWithRidleyId('cus_1');
+    $user->updateRidleyCustomerRecord(['pm_brand' => 'visa', 'pm_last_four' => '4242', 'pm_exp_month' => 12, 'pm_exp_year' => 2030]);
+
+    $this->postRidleyWebhook('customer.deleted', ['id' => 'cus_1', 'customer_id' => 'cus_1'])->assertOk();
+
+    $record = $user->fresh()->ridleyCustomer;
+    expect($record->ridley_id)->toBeNull()
+        ->and($record->pm_last_four)->toBeNull()
+        ->and($user->fresh()->hasRidleyId())->toBeFalse();
 });

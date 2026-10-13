@@ -14,8 +14,4 @@ class User extends Authenticatable
     use Notifiable;
 
     protected $guarded = [];
-
-    protected $casts = [
-        'trial_ends_at' => 'datetime',
-    ];
 }

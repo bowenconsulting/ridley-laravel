@@ -114,29 +114,37 @@ php artisan migrate
 `ridley:install` does the following:
 
 - publishes `config/ridley.php` and the migrations;
-- asks for the billable model (or takes `--model=`) and writes `ridley.model` and `ridley.tables.billable`;
+- asks for the billable model (or takes `--model=`) and writes `ridley.model`;
 - adds any missing `RIDLEY_*` keys to `.env` and `.env.example`;
 - prints the next steps.
 
 It runs non-interactively with flags:
 
 ```bash
-php artisan ridley:install --model="App\Models\Account" --table=accounts --force --no-interaction
+php artisan ridley:install --model="App\Models\Account" --force --no-interaction
 ```
 
 | Option | Meaning |
 | --- | --- |
 | `--model=` | Billable model class (default `App\Models\User`) |
-| `--table=` | Billable table (default: the model's table) |
 | `--force` | Overwrite an existing `config/ridley.php` |
 | `--no-env` | Leave `.env` and `.env.example` untouched |
 
 The migrations do the following:
 
-- add `ridley_customer_id`, `ridley_currency`, `pm_brand`, `pm_last_four`, `pm_exp_month` and `pm_exp_year` to the billable table, plus `trial_ends_at` only when that column doesn't already exist;
-- create `ridley_subscriptions`, `ridley_subscription_items`, `ridley_webhook_events` and `ridley_prices`.
+- create `ridley_customers`, `ridley_subscriptions`, `ridley_subscription_items`, `ridley_webhook_events` and `ridley_prices`.
 
-Subscriptions use a polymorphic `billable` relation, so any model, or several models, can be billable.
+Nothing is added to your billable table. Customers and subscriptions use a polymorphic `billable` relation, so any model, or several models, can be billable.
+
+`ridley_customers` holds one row per billable (like Cashier Paddle's `customers` table): the Ridley customer ID, the locked currency, the default card's display details (`pm_brand`, `pm_last_four`, `pm_exp_month`, `pm_exp_year`) and the generic `trial_ends_at`. Reach it through the `ridleyCustomer` relation, a `Ridley\Laravel\Customer` model, and eager-load it on lists:
+
+```php
+$account->ridleyCustomer?->pm_last_four;
+$account->ridleyCustomer?->hasExpiredCard();
+Account::with('ridleyCustomer')->get();
+```
+
+Swap the model with `Ridley::useRidleyCustomerModel(MyCustomer::class)` (extend `Ridley\Laravel\Customer`).
 
 To ship your own migrations instead, call `Ridley::ignoreMigrations()` in a service provider's `register()` method.
 
@@ -167,8 +175,7 @@ Run it in CI or after deploys.
 | `ridley.currency` | `RIDLEY_CURRENCY` | `USD` | Default currency |
 | `ridley.currency_locale` | `RIDLEY_CURRENCY_LOCALE` | `en` | Locale for `Ridley::formatAmount()` |
 | `ridley.http.timeout` / `connect_timeout` / `retries` / `retry_delay_ms` | – | `30` / `10` / `2` / `500` | HTTP client settings (retries reuse the same idempotency key) |
-| `ridley.tables.billable` | `RIDLEY_BILLABLE_TABLE` | `users` | Billable table for the column migration |
-| `ridley.tables.subscriptions` / `subscription_items` / `webhook_events` / `prices` | – | `ridley_*` | Package table names |
+| `ridley.tables.customers` / `subscriptions` / `subscription_items` / `webhook_events` / `prices` | – | `ridley_*` | Package table names |
 | `ridley.proration.increase` | `RIDLEY_PRORATION_INCREASE` | `always_invoice` | Proration for upgrades in `change()` |
 | `ridley.proration.decrease` | `RIDLEY_PRORATION_DECREASE` | `create_prorations` | Proration for downgrades in `change()` |
 | `ridley.catalogue` | – | `[]` | Items and what they grant ([Catalogue](#catalogue)) |
@@ -317,7 +324,7 @@ class Account extends Model
 }
 ```
 
-Set `ridley.model` (or use `--model` at install) to the billable class. Webhooks find the local owner by `ridley_customer_id` on that model. They fall back to the `billable_type` / `billable_id` metadata that the package writes on every customer, subscription and charge.
+Set `ridley.model` (or use `--model` at install) to the billable class. Webhooks find the local owner through its `ridley_customers` row. They fall back to the `billable_type` / `billable_id` metadata that the package writes on every customer, subscription and charge.
 
 ### Models that already have `subscription()` / `subscriptions()`
 
@@ -374,7 +381,7 @@ $account->findPaymentMethod('pm_...');
 $account->deletePaymentMethod('pm_...');
 ```
 
-`pm_brand`, `pm_last_four` and the expiry are mirrored locally, and webhooks keep them current.
+`pm_brand`, `pm_last_four` and the expiry are mirrored on the `ridleyCustomer` record, and webhooks keep them current. Only display details are stored (no card number), so they don't bring your app into PCI scope.
 
 ## Subscribing
 
@@ -517,10 +524,10 @@ The lower-level Cashier-style methods remain available: `swap()`, `swapAndInvoic
 
 ## Currency
 
-Ridley locks a customer to one currency once they have subscriptions or invoices. The package mirrors that lock in the billable's `ridley_currency` column:
+Ridley locks a customer to one currency once they have subscriptions or invoices. The package mirrors that lock in the `currency` column of the billable's `ridleyCustomer` record:
 
 ```php
-$account->billingCurrency();   // ridley_currency ?? preferredCurrency()
+$account->billingCurrency();   // ridleyCustomer->currency ?? preferredCurrency()
 $account->hasLockedCurrency();
 ```
 
@@ -535,10 +542,10 @@ Override `preferredCurrency()` to choose a currency per billable before it is lo
 The package supports two kinds of trial:
 
 - **Subscription trials:** `trialDays()`, `trialUntil()` or `trialUntilIfFuture()` on the builder. On the subscription, use `onTrial()`, `endTrial()` and `extendTrial()`.
-- **Generic trials (no card up front):** set `trial_ends_at` on the billable, for example at registration.
+- **Generic trials (no card up front):** set `trial_ends_at` on the billable's Ridley customer record, for example at registration.
 
 ```php
-$account->update(['trial_ends_at' => now()->addDays(14)]);
+$account->updateRidleyCustomerRecord(['trial_ends_at' => now()->addDays(14)]);
 
 $account->onGenericTrial();          // true
 $account->onTrial();                 // true – checks both kinds
@@ -551,7 +558,7 @@ $account->newSubscription('default')->catalogue('plan', 'pro', 'USD', 'month')
     ->createOrCheckout($success, $cancel);
 ```
 
-If your app already tracks trials somewhere else, set `RIDLEY_GENERIC_TRIALS=false` before migrating. The billable migration then skips `trial_ends_at` and `ridley:doctor` stops requiring it. Override `genericTrialEndsAt()` to return your own date; `onGenericTrial()` and `trialUntilIfFuture()` use it:
+If your app already tracks trials somewhere else, override `genericTrialEndsAt()` to return your own date; `onGenericTrial()` and `trialUntilIfFuture()` use it:
 
 ```php
 public function genericTrialEndsAt(): ?CarbonImmutable

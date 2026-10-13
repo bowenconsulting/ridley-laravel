@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Ridley\Laravel\Console;
 
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'ridley:install')]
@@ -15,7 +13,6 @@ class InstallCommand extends Command
 {
     protected $signature = 'ridley:install
         {--model= : The billable model class (default App\\Models\\User)}
-        {--table= : The billable table (default: the model\'s table)}
         {--force : Overwrite an existing config/ridley.php}
         {--no-env : Do not touch .env / .env.example}';
 
@@ -44,14 +41,13 @@ class InstallCommand extends Command
         }
 
         $model = ltrim($model, '\\');
-        $table = $this->option('table') ?: $this->guessTable($model);
 
         $this->callSilently('vendor:publish', ['--tag' => 'ridley-config', '--force' => (bool) $this->option('force')]);
         $this->callSilently('vendor:publish', ['--tag' => 'ridley-migrations']);
         $this->components->task('Published config/ridley.php and the migrations');
 
-        $this->writeConfig($files, $model, (string) $table);
-        $this->components->task("Billable model set to {$model} (table {$table})");
+        $this->writeConfig($files, $model);
+        $this->components->task("Billable model set to {$model}");
 
         if (! $this->option('no-env')) {
             foreach (['.env', '.env.example'] as $file) {
@@ -76,16 +72,7 @@ class InstallCommand extends Command
         return self::SUCCESS;
     }
 
-    protected function guessTable(string $model): string
-    {
-        if (class_exists($model) && is_subclass_of($model, Model::class)) {
-            return (new $model)->getTable();
-        }
-
-        return Str::snake(Str::pluralStudly(class_basename($model)));
-    }
-
-    protected function writeConfig(Filesystem $files, string $model, string $table): void
+    protected function writeConfig(Filesystem $files, string $model): void
     {
         $path = $this->laravel->configPath('ridley.php');
 
@@ -101,15 +88,9 @@ class InstallCommand extends Command
             $contents,
         );
 
-        $contents = (string) preg_replace_callback(
-            "/'billable' => env\\('RIDLEY_BILLABLE_TABLE', '[^']*'\\)/",
-            fn () => "'billable' => env('RIDLEY_BILLABLE_TABLE', ".var_export($table, true).')',
-            $contents,
-        );
-
         $files->put($path, $contents);
 
-        config(['ridley.model' => $model, 'ridley.tables.billable' => $table]);
+        config(['ridley.model' => $model]);
     }
 
     /**

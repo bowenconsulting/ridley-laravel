@@ -187,8 +187,8 @@ class WebhookController extends Controller
                 $subscription->afterSync(SubscriptionSynced::SOURCE_WEBHOOK);
             });
 
-            $billable->forceFill([
-                'ridley_customer_id' => null,
+            $billable->ridleyCustomer()->first()?->forceFill([
+                'ridley_id' => null,
                 'pm_brand' => null,
                 'pm_last_four' => null,
                 'pm_exp_month' => null,

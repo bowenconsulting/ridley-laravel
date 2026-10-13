@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Request;
+use Ridley\Laravel\Customer;
 use Ridley\Laravel\Exceptions\CardException;
 use Ridley\Laravel\Exceptions\CurrencyLocked;
 use Ridley\Laravel\Exceptions\InvalidCustomer;
@@ -46,14 +47,14 @@ it('manages payment methods and mirrors the default card', function () {
 
     $user->updateDefaultPaymentMethod($first['id']);
 
-    expect($user->fresh()->pm_last_four)->toBe('1111')
+    expect($user->fresh()->ridleyCustomer->pm_last_four)->toBe('1111')
         ->and($user->defaultPaymentMethod()->id())->toBe($first['id']);
 
     $user->updateDefaultPaymentMethodFromRidley();
-    expect($user->pm_last_four)->toBe('1111');
+    expect($user->ridleyCustomer->pm_last_four)->toBe('1111');
 
     $user->deletePaymentMethod($first['id']);
-    expect($user->fresh()->pm_last_four)->toBeNull()
+    expect($user->fresh()->ridleyCustomer->pm_last_four)->toBeNull()
         ->and($user->findPaymentMethod($second['id'])?->id())->toBe($second['id']);
 });
 
@@ -86,7 +87,7 @@ it('locks the billing currency on the first invoiced charge', function () {
 
     $user->chargeWithInvoice('10.00', ['currency' => 'EUR']);
 
-    expect($user->fresh()->ridley_currency)->toBe('EUR')
+    expect($user->fresh()->ridleyCustomer->currency)->toBe('EUR')
         ->and($user->fresh()->billingCurrency())->toBe('EUR')
         ->and(fn () => $user->fresh()->assertCurrencyAllowed('USD'))->toThrow(CurrencyLocked::class);
 });
@@ -191,4 +192,24 @@ it('carries a checkout reference on the success URL and finds the session again'
 
     expect(Ridley::checkoutSession(Request::create('https://app.example.com/done?ridley_checkout=unknown'), $user))->toBeNull()
         ->and(Ridley::checkoutSession(Request::create('https://app.example.com/done'), $user))->toBeNull();
+});
+
+it('keeps customer state on one polymorphic record per billable', function () {
+    $fake = Ridley::fake();
+    $user = $this->user();
+
+    expect($user->ridleyCustomer)->toBeNull()
+        ->and($user->hasDefaultPaymentMethod())->toBeFalse();
+
+    $user->createAsRidleyCustomer();
+    $fake->addPaymentMethod($user->ridleyId(), ['last4' => '1111', 'exp_month' => 1, 'exp_year' => 2020]);
+    $user->updateDefaultPaymentMethodFromRidley();
+    $user->lockBillingCurrency('usd');
+
+    $record = $user->fresh()->ridleyCustomer;
+    expect(Customer::query()->count())->toBe(1)
+        ->and($record->billable->is($user))->toBeTrue()
+        ->and($record->currency)->toBe('USD')
+        ->and($record->hasExpiredCard())->toBeTrue()
+        ->and(Ridley::findBillable($user->ridleyId())?->is($user))->toBeTrue();
 });

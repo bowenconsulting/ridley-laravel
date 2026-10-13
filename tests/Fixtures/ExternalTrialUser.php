@@ -7,7 +7,7 @@ namespace Ridley\Laravel\Tests\Fixtures;
 use Carbon\CarbonImmutable;
 
 /**
- * A billable that keeps its trial date somewhere other than `trial_ends_at`.
+ * A billable that keeps its trial date somewhere other than the Ridley customer record.
  */
 class ExternalTrialUser extends User
 {

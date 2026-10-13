@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Ridley\Laravel;
 
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Notifications\RoutesNotifications;
 use Ridley\Laravel\Concerns\ManagesCustomer;
@@ -16,7 +17,8 @@ use Ridley\Laravel\Concerns\PerformsCharges;
 /**
  * Add to an Eloquent model to make it billable through Ridley.
  *
- * Required columns: ridley_customer_id, pm_brand, pm_last_four, pm_exp_month, pm_exp_year.
+ * Customer state (Ridley ID, locked currency, default card, generic trial) lives in the
+ * `ridley_customers` table, reached through {@see ridleyCustomer()}.
  */
 trait Billable
 {
@@ -26,6 +28,36 @@ trait Billable
     use ManagesPaymentMethods;
     use ManagesSubscriptions;
     use PerformsCharges;
+
+    /**
+     * The local Ridley customer record.
+     *
+     * @return MorphOne<Customer, $this>
+     */
+    public function ridleyCustomer(): MorphOne
+    {
+        return $this->morphOne(Ridley::ridleyCustomerModel(), 'billable');
+    }
+
+    /**
+     * Create or update the local Ridley customer record.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function updateRidleyCustomerRecord(array $attributes): Customer
+    {
+        /** @var Customer $record */
+        $record = $this->ridleyCustomer ?? $this->ridleyCustomer()->make();
+        $record->forceFill($attributes);
+
+        if (! $record->exists || $record->isDirty()) {
+            $this->ridleyCustomer()->save($record);
+        }
+
+        $this->setRelation('ridleyCustomer', $record);
+
+        return $record;
+    }
 
     /**
      * Who receives the package's billing notifications for this billable.

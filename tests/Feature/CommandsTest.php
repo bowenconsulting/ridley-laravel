@@ -36,7 +36,7 @@ describe('ridley:install', function () {
     });
 
     it('publishes, configures the model and adds env keys without prompting', function () {
-        $this->artisan('ridley:install', ['--model' => 'App\\Models\\Account', '--table' => 'accounts', '--no-interaction' => true])
+        $this->artisan('ridley:install', ['--model' => 'App\\Models\\Account', '--no-interaction' => true])
             ->expectsOutputToContain('Next steps')
             ->assertSuccessful();
 
@@ -44,12 +44,12 @@ describe('ridley:install', function () {
         $env = File::get(base_path('.env'));
 
         expect($config)->toContain("env('RIDLEY_MODEL', 'App\\\\Models\\\\Account')")
-            ->toContain("env('RIDLEY_BILLABLE_TABLE', 'accounts')")
             ->and($env)->toContain('RIDLEY_SECRET=')
             ->toContain('RIDLEY_WEBHOOK_SECRET=')
             ->and(substr_count($env, 'RIDLEY_CURRENCY='))->toBe(1)
             ->and(File::get(base_path('.env.example')))->toContain('RIDLEY_SECRET=')
-            ->and(File::glob(database_path('migrations/*create_ridley_subscriptions_table.php')))->toHaveCount(1);
+            ->and(File::glob(database_path('migrations/*create_ridley_subscriptions_table.php')))->toHaveCount(1)
+            ->and(File::glob(database_path('migrations/*create_ridley_customers_table.php')))->toHaveCount(1);
 
         // Re-running is idempotent.
         $this->artisan('ridley:install', ['--model' => 'App\\Models\\Account', '--no-interaction' => true])->assertSuccessful();

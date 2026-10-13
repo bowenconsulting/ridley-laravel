@@ -41,7 +41,8 @@ it('computes features and limits from the plan and add-ons', function () {
 
 it('grants generic trial access', function () {
     config(['ridley.trial' => ['catalogue_item' => 'plan.starter', 'features' => ['beta'], 'limits' => ['seats' => 2]]]);
-    $user = $this->user(['trial_ends_at' => Carbon::now()->addDays(7)]);
+    $user = $this->user();
+    $user->updateRidleyCustomerRecord(['trial_ends_at' => Carbon::now()->addDays(7)]);
 
     expect($user->onGenericTrial())->toBeTrue()
         ->and($user->onTrial())->toBeTrue()
@@ -49,7 +50,7 @@ it('grants generic trial access', function () {
         ->and($user->ridleyFeatures()->sort()->values()->all())->toBe(['beta', 'reports'])
         ->and($user->ridleyLimit('seats'))->toBe(3);
 
-    $user->update(['trial_ends_at' => Carbon::now()->subDay()]);
+    $user->updateRidleyCustomerRecord(['trial_ends_at' => Carbon::now()->subDay()]);
 
     expect($user->onGenericTrial())->toBeFalse()
         ->and($user->hasExpiredGenericTrial())->toBeTrue()

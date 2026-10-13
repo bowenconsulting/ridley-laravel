@@ -78,7 +78,7 @@ return [
     ],
 
     'tables' => [
-        'billable' => env('RIDLEY_BILLABLE_TABLE', 'users'),
+        'customers' => 'ridley_customers',
         'subscriptions' => 'ridley_subscriptions',
         'subscription_items' => 'ridley_subscription_items',
         'webhook_events' => 'ridley_webhook_events',
@@ -173,18 +173,16 @@ return [
     | Generic trial entitlements
     |--------------------------------------------------------------------------
     |
-    | What a billable on a generic trial (trial_ends_at on the billable, no
-    | subscription yet) may use: the features/limits of a catalogue item
-    | (e.g. 'plan.starter') and/or explicit features and limits.
+    | What a billable on a generic trial (trial_ends_at on its Ridley customer
+    | record, no subscription yet) may use: the features/limits of a catalogue
+    | item (e.g. 'plan.starter') and/or explicit features and limits.
     |
-    | Set `generic` to false when your app tracks trials elsewhere: the
-    | migration then skips the `trial_ends_at` column, and you override
-    | genericTrialEndsAt() on the billable to read your own trial date.
+    | If your app tracks trials elsewhere, override genericTrialEndsAt() on
+    | the billable to read your own trial date.
     |
     */
 
     'trial' => [
-        'generic' => env('RIDLEY_GENERIC_TRIALS', true),
         'catalogue_item' => env('RIDLEY_TRIAL_ITEM'),
         'features' => [],
         'limits' => [],

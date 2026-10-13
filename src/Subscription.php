@@ -1314,8 +1314,8 @@ class Subscription extends Model
 
     protected function ownerCustomerId(): ?string
     {
-        $customerId = $this->owner?->getAttribute('ridley_customer_id');
+        $owner = $this->owner;
 
-        return is_string($customerId) ? $customerId : null;
+        return $owner !== null && method_exists($owner, 'ridleyId') ? $owner->ridleyId() : null;
     }
 }

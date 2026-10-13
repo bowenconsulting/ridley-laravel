@@ -33,7 +33,7 @@ it('creates a subscription from catalogue keys and mirrors it locally', function
         ->and($subscription->selection())->toBe(['plan' => ['professional' => 1], 'addon' => ['extra_seat' => 2]])
         ->and($subscription->itemInGroup('plan')->price->item_key)->toBe('professional')
         ->and($subscription->itemInGroup('plan')->group())->toBe('plan')
-        ->and($user->fresh()->ridley_currency)->toBe('USD');
+        ->and($user->fresh()->ridleyCustomer->currency)->toBe('USD');
 
     $remote = $fake->find($subscription->ridley_id);
     expect($remote['metadata'])->toMatchArray(['type' => 'default', 'billable_type' => $user->getMorphClass(), 'ref' => 'x']);
@@ -63,7 +63,8 @@ it('accepts Price models, ids and lookup keys', function () {
 it('defers catalogue currency to the billing currency', function () {
     $fake = Ridley::fake();
     $this->syncCatalogue();
-    $user = $this->customerWithCard(['ridley_currency' => 'EUR']);
+    $user = $this->customerWithCard();
+    $user->updateRidleyCustomerRecord(['currency' => 'EUR']);
 
     $user->newSubscription('default')->catalogue('plan', 'professional', null, 'month')->create();
 
@@ -76,7 +77,8 @@ it('defers catalogue currency to the billing currency', function () {
 it('rejects a different currency once locked', function () {
     Ridley::fake();
     $this->syncCatalogue();
-    $user = $this->customerWithCard(['ridley_currency' => 'EUR']);
+    $user = $this->customerWithCard();
+    $user->updateRidleyCustomerRecord(['currency' => 'EUR']);
 
     expect(fn () => $user->newSubscription('default')->catalogue('plan', 'starter', 'USD', 'month')->create())
         ->toThrow(CurrencyLocked::class);
@@ -97,7 +99,7 @@ it('handles trials', function () {
     $user->newSubscription('past')->catalogue('plan', 'starter', 'USD', 'month')->trialUntilIfFuture(Carbon::now()->subDay())->create();
     $fake->assertCreated('subscriptions', fn (array $params) => ($params['metadata']['type'] ?? null) === 'past' && ! isset($params['trial_end']));
 
-    $user->update(['trial_ends_at' => Carbon::now()->addDays(5)]);
+    $user->updateRidleyCustomerRecord(['trial_ends_at' => Carbon::now()->addDays(5)]);
     $user->newSubscription('generic')->catalogue('plan', 'starter', 'USD', 'month')->trialUntilIfFuture()->create();
     expect($user->ridleySubscription('generic')->trial_ends_at->isSameDay(Carbon::now()->addDays(5)))->toBeTrue();
 });
@@ -111,7 +113,7 @@ it('takes the trial end from an overridden genericTrialEndsAt', function () {
     try {
         $subscription = $user->newSubscription('default')->catalogue('plan', 'starter', 'USD', 'month')->trialUntilIfFuture()->create();
 
-        expect($user->getAttribute('trial_ends_at'))->toBeNull()
+        expect($user->ridleyCustomer->trial_ends_at)->toBeNull()
             ->and($user->onGenericTrial())->toBeTrue()
             ->and($subscription->trial_ends_at->isSameDay(CarbonImmutable::now()->addDays(9)))->toBeTrue();
     } finally {

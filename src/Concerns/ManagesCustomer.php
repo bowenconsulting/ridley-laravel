@@ -25,7 +25,7 @@ trait ManagesCustomer
      */
     public function ridleyId(): ?string
     {
-        $id = $this->getAttribute('ridley_customer_id');
+        $id = $this->ridleyCustomer?->ridley_id;
 
         return is_string($id) && $id !== '' ? $id : null;
     }
@@ -60,7 +60,7 @@ trait ManagesCustomer
 
         $customer = Ridley::client()->customers()->create($this->ridleyCustomerPayload($options));
 
-        $this->forceFill(['ridley_customer_id' => $customer->id()])->save();
+        $this->updateRidleyCustomerRecord(['ridley_id' => $customer->id()]);
 
         return $customer;
     }
@@ -178,7 +178,7 @@ trait ManagesCustomer
      */
     public function billingCurrency(): string
     {
-        $locked = $this->getAttribute('ridley_currency');
+        $locked = $this->ridleyCustomer?->currency;
 
         return is_string($locked) && $locked !== '' ? strtoupper($locked) : $this->preferredCurrency();
     }
@@ -188,7 +188,7 @@ trait ManagesCustomer
      */
     public function hasLockedCurrency(): bool
     {
-        $locked = $this->getAttribute('ridley_currency');
+        $locked = $this->ridleyCustomer?->currency;
 
         return is_string($locked) && $locked !== '';
     }
@@ -202,7 +202,7 @@ trait ManagesCustomer
             return;
         }
 
-        $this->forceFill(['ridley_currency' => strtoupper($currency)])->save();
+        $this->updateRidleyCustomerRecord(['currency' => strtoupper($currency)]);
     }
 
     /**

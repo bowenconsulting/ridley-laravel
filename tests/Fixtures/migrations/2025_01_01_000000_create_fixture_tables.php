@@ -22,13 +22,6 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->nullable();
-            $table->string('ridley_customer_id')->nullable()->index();
-            $table->string('pm_brand')->nullable();
-            $table->string('pm_last_four', 4)->nullable();
-            $table->unsignedTinyInteger('pm_exp_month')->nullable();
-            $table->unsignedSmallInteger('pm_exp_year')->nullable();
-            $table->char('ridley_currency', 3)->nullable();
-            $table->timestamp('trial_ends_at')->nullable();
             $table->timestamps();
         });
 

@@ -33,6 +33,11 @@ final class Ridley
     public static ?string $customerModel = null;
 
     /**
+     * @var class-string<Customer>
+     */
+    public static string $ridleyCustomerModel = Customer::class;
+
+    /**
      * @var class-string<Subscription>
      */
     public static string $subscriptionModel = Subscription::class;
@@ -159,6 +164,24 @@ final class Ridley
     {
         /** @var class-string<Model> */
         return self::$customerModel ?? config('ridley.model', 'App\\Models\\User');
+    }
+
+    /**
+     * The model holding each billable's Ridley customer record.
+     *
+     * @param  class-string<Customer>  $model
+     */
+    public static function useRidleyCustomerModel(string $model): void
+    {
+        self::$ridleyCustomerModel = $model;
+    }
+
+    /**
+     * @return class-string<Customer>
+     */
+    public static function ridleyCustomerModel(): string
+    {
+        return self::$ridleyCustomerModel;
     }
 
     /**
@@ -309,9 +332,11 @@ final class Ridley
             return null;
         }
 
-        $class = self::customerModel();
+        $class = self::ridleyCustomerModel();
 
-        return (new $class)->newQuery()->where('ridley_customer_id', $customerId)->first();
+        $billable = (new $class)->newQuery()->where('ridley_id', $customerId)->first()?->billable;
+
+        return $billable instanceof Model && in_array(Billable::class, class_uses_recursive($billable), true) ? $billable : null;
     }
 
     /**

@@ -125,7 +125,7 @@ trait ManagesSubscriptions
     }
 
     /**
-     * On a trial without a subscription (`trial_ends_at` on the billable is in the future).
+     * On a trial without a subscription (`trial_ends_at` on the Ridley customer record is in the future).
      */
     public function onGenericTrial(): bool
     {
@@ -143,7 +143,7 @@ trait ManagesSubscriptions
 
     public function genericTrialEndsAt(): ?CarbonImmutable
     {
-        return Timestamp::parse($this->getAttribute('trial_ends_at'));
+        return Timestamp::parse($this->ridleyCustomer?->trial_ends_at);
     }
 
     /**
